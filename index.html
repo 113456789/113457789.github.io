@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>乳腺癌术前新辅助治疗 · 个案管理师培训</title>
+<style>
+  :root {
+    --accent: #c55a7a; --accent-dark: #a03d5e;
+    --ink: #2f3a4d; --bg: #f5f9fc; --card: #ffffff;
+    --ok: #2e9e6b; --bad: #d64545;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg); color: var(--ink); min-height: 100vh;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { text-align: center; margin-bottom: 18px; }
+  header h1 { font-size: 26px; color: var(--accent-dark); }
+  header p { color: #6b7a90; margin-top: 6px; font-size: 14px; }
+
+  .player-box { position: relative; background: #000; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 30px rgba(47,58,77,.18); }
+  video { width: 100%; display: block; }
+  /* 容器全屏时的布局（弹窗在容器内，可正常显示） */
+  .player-box:fullscreen { border-radius: 0; display: flex; align-items: center; justify-content: center; }
+  .player-box:-webkit-full-screen { border-radius: 0; display: flex; align-items: center; justify-content: center; }
+  .player-box:fullscreen video,
+  .player-box:-webkit-full-screen video { width: auto; max-width: 100%; max-height: 100vh; }
+  .player-box:fullscreen .quiz-card,
+  .player-box:-webkit-full-screen .quiz-card { max-height: 92vh; overflow-y: auto; }
+  /* iPhone 伪全屏兜底 */
+  .player-box.pseudo-fs { position: fixed; inset: 0; z-index: 999; border-radius: 0; }
+  .player-box.pseudo-fs video { width: 100%; height: 100%; object-fit: contain; }
+  body.pseudo-lock { overflow: hidden; }
+
+  /* 自定义按钮（全屏 / 字幕开关） */
+  .fs-btn, .cc-btn {
+    position: absolute; bottom: 58px; z-index: 6;
+    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(20,28,40,.55); color: #fff; font-size: 15px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit; font-weight: 600;
+  }
+  .fs-btn { right: 12px; font-size: 18px; }
+  .cc-btn { right: 60px; }
+  .cc-btn.on { background: var(--accent); }
+  .fs-btn:hover, .cc-btn:hover { background: rgba(20,28,40,.8); }
+  .cc-btn.on:hover { background: var(--accent-dark); }
+
+  /* 网页字幕层 */
+  .sub-line {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: 58px; z-index: 5; max-width: 86%;
+    background: rgba(20,28,40,.62); color: #fff;
+    font-size: 14px; line-height: 1.5; text-align: center;
+    padding: 4px 12px; border-radius: 6px; pointer-events: none;
+    display: none; white-space: normal;
+  }
+  .sub-line.show { display: block; }
+  @media (max-width: 480px) {
+    .sub-line { font-size: 12px; bottom: 52px; padding: 3px 9px; }
+  }
+
+  /* 预载遮罩 */
+  .load-mask {
+    position: absolute; inset: 0; background: #101826; z-index: 5;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #dfe7f2; gap: 14px;
+  }
+  .load-mask.hide { display: none; }
+  .spinner {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,.18); border-top-color: var(--accent);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .load-mask .lt { font-size: 15px; }
+  .load-mask .ls { font-size: 13px; color: #93a3ba; }
+
+  /* 答题弹窗（遮罩可整体滚动，手机竖屏也能滑到底部） */
+  .quiz-mask {
+    position: absolute; inset: 0; background: rgba(20,28,40,.72);
+    display: none; z-index: 10;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 16px;
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  }
+  .quiz-mask.show { display: flex; }
+  .quiz-card {
+    background: var(--card); width: min(620px, 100%); border-radius: 14px;
+    padding: 26px 28px; box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    margin: auto;   /* flex 容器内 margin:auto = 居中且超出时可滚 */
+  }
+  /* 手机竖屏适配 */
+  @media (max-width: 480px) {
+    .quiz-mask { padding: 10px; }
+    .quiz-card { padding: 16px 14px; border-radius: 12px; }
+    .quiz-card .tag { font-size: 12px; margin-bottom: 8px; }
+    .quiz-card h3 { font-size: 15.5px; margin-bottom: 10px; }
+    .opt { font-size: 13.5px; padding: 9px 12px; margin-bottom: 8px; }
+    .quiz-msg { font-size: 12.5px; min-height: 18px; }
+    .btn-continue { padding: 10px; font-size: 15px; }
+  }
+  /* 手机横屏/全屏矮窗口适配 */
+  @media (max-height: 500px) {
+    .quiz-card { padding: 12px 16px; }
+    .quiz-card .tag { margin-bottom: 6px; }
+    .quiz-card h3 { font-size: 15px; margin-bottom: 8px; }
+    .opt { padding: 7px 12px; margin-bottom: 6px; font-size: 13px; }
+    .quiz-msg { font-size: 12px; min-height: 16px; }
+    .btn-continue { padding: 8px; font-size: 14px; margin-top: 6px; }
+  }
+  .quiz-card .tag {
+    display: inline-block; background: var(--accent); color: #fff;
+    font-size: 13px; padding: 3px 12px; border-radius: 999px; margin-bottom: 12px;
+  }
+  .quiz-card h3 { font-size: 18px; line-height: 1.55; margin-bottom: 16px; }
+  .opt {
+    display: block; width: 100%; text-align: left; font-size: 15px; line-height: 1.5;
+    padding: 12px 16px; margin-bottom: 10px; border-radius: 10px;
+    border: 1.5px solid #d8e0ea; background: #fafcfe; cursor: pointer;
+    transition: all .15s; font-family: inherit; color: var(--ink);
+    -webkit-appearance: none; appearance: none;
+  }
+  .opt:hover { border-color: var(--accent); background: #fdf3f6; }
+  .opt.correct { border-color: var(--ok); background: #eefaf4; color: var(--ok); font-weight: 600; }
+  .opt.wrong { border-color: var(--bad); background: #fdf0f0; color: var(--bad); animation: shake .35s; }
+  .opt:disabled { cursor: default; }
+  .opt:not(.correct):not(.wrong):disabled { opacity: .55; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  .quiz-msg { min-height: 22px; font-size: 14px; margin-top: 4px; line-height: 1.6; }
+  .quiz-msg.bad { color: var(--bad); }
+  .quiz-msg.good { color: var(--ok); }
+  .btn-continue {
+    display: none; margin-top: 10px; width: 100%; padding: 12px;
+    background: var(--ok); color: #fff; border: none; border-radius: 10px;
+    font-size: 16px; cursor: pointer; font-family: inherit;
+    -webkit-appearance: none; appearance: none;
+  }
+  .btn-continue:hover { background: #268a5d; }
+  .passed-list { margin-top: 12px; display: flex; gap: 8px; justify-content: center; }
+  .passed-list span {
+    width: 26px; height: 26px; border-radius: 50%; background: #e3e9f0; color: #9aa7b8;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .passed-list span.hit { background: var(--ok); color: #fff; }
+  .tip-bar {
+    margin-top: 14px; background: var(--card); border-radius: 10px;
+    padding: 12px 16px; box-shadow: 0 2px 10px rgba(47,58,77,.08);
+    font-size: 14px; color: #4a5872; text-align: center;
+  }
+  footer { text-align: center; margin-top: 26px; color: #8a97a8; font-size: 12.5px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>乳腺癌术前新辅助治疗</h1>
+    <p>个案管理师上岗培训 · 医学知识系列 ｜ 视频约 8 分钟，途中设有 5 道随堂题，答对方可继续观看</p>
+  </header>
+
+  <div class="player-box" id="playerBox">
+    <video id="v" playsinline webkit-playsinline preload="auto"></video>
+    <div class="load-mask" id="loadMask">
+      <div class="spinner"></div>
+      <div class="lt">课程视频加载中…</div>
+      <div class="ls" id="loadStatus">正在准备（约 10MB，视网络情况需数秒）</div>
+    </div>
+    <button class="cc-btn on" id="ccBtn" title="字幕开关">字</button>
+    <button class="fs-btn" id="fsBtn" title="全屏">⛶</button>
+    <div class="sub-line" id="subLine"></div>
+    <div class="quiz-mask" id="quizMask">
+      <div class="quiz-card">
+        <span class="tag">随堂提问 <span id="quizNo"></span>/5</span>
+        <h3 id="quizQ"></h3>
+        <div id="quizOpts"></div>
+        <div class="quiz-msg" id="quizMsg"></div>
+        <button class="btn-continue" id="btnGo">继续观看 ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-bar">进度条可自由拖动 ｜ 播放或拖动到达考查点会自动暂停出题（跳过的题会依序补出），答对后继续</div>
+  <div class="passed-list" id="passedList">
+    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+  </div>
+
+  <footer>
+    知识依据：CSCO 乳腺癌诊疗指南（2026）、乳腺肿瘤学，参考 ima 共享知识库补充<br>
+    语音：AI 温柔女声 ｜ 仅用于个案管理师内部培训
+  </footer>
+</div>
+
+<script src="sub_data.js"></script>
+<script>
+const video = document.getElementById('v');
+const box = document.getElementById('playerBox');
+const fsBtn = document.getElementById('fsBtn');
+const ccBtn = document.getElementById('ccBtn');
+const subLine = document.getElementById('subLine');
+const mask = document.getElementById('quizMask');
+const loadMask = document.getElementById('loadMask');
+const loadStatus = document.getElementById('loadStatus');
+const quizNo = document.getElementById('quizNo');
+const quizQ = document.getElementById('quizQ');
+const quizOpts = document.getElementById('quizOpts');
+const quizMsg = document.getElementById('quizMsg');
+const btnGo = document.getElementById('btnGo');
+const passedList = document.getElementById('passedList');
+
+/* ---------- 随堂题库（单选，答对才能继续） ---------- */
+const QUIZZES = [
+  { t: 136,
+    q: "下列哪项【不属于】乳腺癌术前新辅助治疗的适应证？",
+    opts: ["肿块较大（>5cm）", "腋窝淋巴结转移", "肿瘤 1cm 的激素受体阳性患者，无保乳意愿", "有保乳意愿，但肿瘤与乳房体积比例大、难以保乳"],
+    a: 2,
+    exp: "肿瘤小、无保乳需求的患者直接手术即可，不属于新辅助治疗适应证；其余（肿块>5cm、腋窝淋巴结转移、HER-2 阳性*、三阴性*、保乳困难）满足其一即可考虑。" },
+  { t: 214,
+    q: "HER-2 阳性乳腺癌新辅助治疗的一级推荐方案是？",
+    opts: ["AC-T 方案", "TCbHP 或 THP（含曲妥珠单抗 + 帕妥珠单抗双靶）", "新辅助内分泌治疗", "单纯手术切除"],
+    a: 1,
+    exp: "HER-2 阳性新辅助治疗已进入\"双靶打底、去蒽环为趋势\"的时代，TCbHP 与 THP 为一级推荐。" },
+  { t: 300,
+    q: "KEYNOTE-522 研究中，三阴性乳腺癌化疗基础上加用帕博利珠单抗后，pCR 率的变化是？",
+    opts: ["51.2% 提升至 64.8%", "22% 提升至 41%", "无显著差异", "64.8% 降至 51.2%"],
+    a: 0,
+    exp: "KEYNOTE-522：含铂+蒽环化疗全程联合帕博利珠单抗，pCR 从 51.2% 提高到 64.8%，并显著改善无事件生存与总生存。" },
+  { t: 372,
+    q: "绝经前激素受体阳性患者接受新辅助内分泌治疗时，方案中必须联合的是？",
+    opts: ["蒽环类化疗药", "OFS 卵巢功能抑制", "卡铂", "PD-1 免疫抑制剂"],
+    a: 1,
+    exp: "绝经前患者需加用 OFS 切断卵巢雌激素来源，漏用则内分泌治疗疗效大打折扣。" },
+  { t: 424,
+    q: "以下哪项【可以】判定为绝经状态？",
+    opts: ["自然停经 6 个月", "年龄 ≥ 60 岁", "35 岁、停经 1 年，未查激素水平", "正在服用他莫昔芬、激素水平仅检测一次且达标"],
+    a: 1,
+    exp: "判定标准：双侧卵巢切除术后；年龄≥60岁；<60岁自然停经≥12个月且近1年未用相关药物、FSH 和雌二醇达绝经后水平；<60岁服用他莫昔芬/托瑞米芬者需连续两次达标。" },
+];
+
+/* ---------- 预载整片为本地 Blob（绕开网关不支持 Range 的问题） ---------- */
+(async function preload() {
+  try {
+    const res = await fetch('video.mp4');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    let blob;
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      const chunks = [];
+      let received = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        loadStatus.textContent = '已加载 ' + (received / 1048576).toFixed(1) + ' MB / 约 10 MB';
+      }
+      blob = new Blob(chunks, { type: 'video/mp4' });
+    } else {
+      blob = await res.blob();
+    }
+    video.src = URL.createObjectURL(blob);
+    video.controls = true;
+    loadMask.classList.add('hide');
+  } catch (e) {
+    loadStatus.textContent = '加载失败，请刷新页面重试（' + e.message + '）';
+    document.querySelector('.spinner').style.display = 'none';
+  }
+})();
+
+/* ---------- 字幕开关（网页字幕层，秒开秒关） ---------- */
+let subsOn = localStorage.getItem('rx_subs_on') !== '0';   // 默认开
+function refreshCC() {
+  ccBtn.classList.toggle('on', subsOn);
+  if (!subsOn) subLine.classList.remove('show');
+}
+ccBtn.onclick = () => {
+  subsOn = !subsOn;
+  localStorage.setItem('rx_subs_on', subsOn ? '1' : '0');
+  refreshCC();
+};
+function updateSub() {
+  if (!subsOn || gating) { subLine.classList.remove('show'); return; }
+  const t = video.currentTime;
+  const cue = SUBS.find(c => t >= c[0] && t <= c[1]);
+  if (cue) {
+    subLine.textContent = cue[2];
+    subLine.classList.add('show');
+  } else {
+    subLine.classList.remove('show');
+  }
+}
+video.addEventListener('timeupdate', updateSub);
+video.addEventListener('seeked', updateSub);
+refreshCC();
+
+/* ---------- 弹窗逻辑：到达或拖动越过未作答题 => 依序弹出 ---------- */
+let gating = false;
+let quizIdx = -1;
+const passed = new Set();
+
+video.addEventListener('timeupdate', () => {
+  if (gating) return;
+  const t = video.currentTime;
+  const due = QUIZZES.findIndex((qz, i) => !passed.has(i) && t >= qz.t);
+  if (due >= 0) openQuiz(due);
+});
+
+function openQuiz(i) {
+  gating = true;
+  quizIdx = i;
+  // 容器全屏内直接弹题，不退出全屏；
+  // 仅当处于 iPhone 原生视频全屏（网页元素无法覆盖）时才先退出
+  if (!fsElement() && video.webkitDisplayingFullscreen) {
+    try { video.webkitExitFullscreen(); } catch (e) {}
+  }
+  video.pause();                     // 原地暂停，不回跳
+  setTimeout(() => {
+    const qz = QUIZZES[i];
+    quizNo.textContent = i + 1;
+    quizQ.textContent = qz.q;
+    quizMsg.textContent = '';
+    quizMsg.className = 'quiz-msg';
+    btnGo.style.display = 'none';
+    quizOpts.innerHTML = '';
+    qz.opts.forEach((txt, k) => {
+      const b = document.createElement('button');
+      b.className = 'opt';
+      b.textContent = 'ABCD'[k] + '．' + txt;
+      b.onclick = () => choose(b, k, qz);
+      quizOpts.appendChild(b);
+    });
+    mask.classList.add('show');
+  }, 350);
+}
+
+function choose(btn, k, qz) {
+  const opts = quizOpts.querySelectorAll('.opt');
+  if (btn.disabled) return;
+  if (k === qz.a) {
+    opts.forEach(o => o.disabled = true);
+    btn.classList.add('correct');
+    quizMsg.textContent = '✓ 回答正确！' + qz.exp;
+    quizMsg.className = 'quiz-msg good';
+    btnGo.style.display = 'block';
+    passed.add(quizIdx);
+    passedList.children[quizIdx].classList.add('hit');
+  } else {
+    btn.classList.add('wrong');
+    btn.disabled = true;
+    quizMsg.textContent = '✗ 不对哦，再想一想～ 提示：结合刚才讲到的指南内容作答';
+    quizMsg.className = 'quiz-msg bad';
+  }
+}
+
+btnGo.onclick = () => {
+  mask.classList.remove('show');
+  gating = false;
+  const p = video.play();
+  if (p && p.catch) p.catch(() => {});
+};
+
+/* ---------- 全屏：作用于播放器容器（弹窗随容器全屏显示） ---------- */
+function fsElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+function exitAnyFullscreen() {
+  try {
+    if (fsElement()) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
+    if (video.webkitExitFullscreen) video.webkitExitFullscreen();  // iPhone 原生视频全屏
+    box.classList.remove('pseudo-fs');
+    document.body.classList.remove('pseudo-lock');
+  } catch (e) {}
+}
+fsBtn.onclick = () => {
+  if (fsElement() || box.classList.contains('pseudo-fs')) {
+    exitAnyFullscreen();
+    return;
+  }
+  if (box.requestFullscreen) {
+    box.requestFullscreen().catch(() => pseudoFS());
+  } else if (box.webkitRequestFullscreen) {
+    box.webkitRequestFullscreen();
+  } else if (video.webkitEnterFullscreen) {
+    video.webkitEnterFullscreen();      // iPhone：原生全屏；弹题时会自动退出
+  } else {
+    pseudoFS();
+  }
+};
+function pseudoFS() {                   // 兜底伪全屏（iOS 老系统等）
+  box.classList.add('pseudo-fs');
+  document.body.classList.add('pseudo-lock');
+}
+</script>
+</body>
+</html>
